@@ -30,7 +30,7 @@ const handleRequestSuccess = (config) => {
     }
     return config;
 };
-//**8* */
+
 const handleRequestError = (error) => {
     return Promise.reject(error);
 };

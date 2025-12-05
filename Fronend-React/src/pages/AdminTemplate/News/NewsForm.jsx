@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useFormik } from 'formik';
 import { tinTucAPI, loaiTinAPI, uploadAPI } from '../../../services/api';
+import { newsValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../_components/Input';
 import Select from '../_components/Select';
 import Textarea from '../_components/Textarea';
 import Button from '../_components/Button';
 import ImageUpload from '../_components/ImageUpload';
+import RichTextEditor from '../_components/RichTextEditor';
 
 const NewsForm = () => {
     const navigate = useNavigate();
@@ -15,17 +18,54 @@ const NewsForm = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
-    const [formData, setFormData] = useState({
-        tieu_de: '',
-        tom_tat: '',
-        noi_dung: '',
-        hinh: '',
-        ngay: new Date().toISOString().split('T')[0],
-        id_loai: '',
-        an_hien: 1,
-        xem: 0
+
+    // Formik setup
+    const formik = useFormik({
+        initialValues: {
+            tieu_de: '',
+            slug: '',
+            mo_ta: '',
+            noi_dung: '',
+            hinh: '',
+            ngay: new Date().toISOString().split('T')[0],
+            id_loai: '',
+            an_hien: 1,
+            hot: 0,
+            luot_xem: 0,
+            tags: ''
+        },
+        validationSchema: newsValidationSchema,
+        onSubmit: async (values, { setSubmitting }) => {
+            setLoading(true);
+            try {
+                console.log('📦 Submitting news data:', values);
+
+                if (isEdit) {
+                    const response = await tinTucAPI.update(id, values);
+                    console.log('✅ Update response:', response.data);
+                    alert('Cập nhật tin tức thành công');
+                } else {
+                    const response = await tinTucAPI.create(values);
+                    console.log('✅ Create response:', response.data);
+                    alert('Thêm tin tức thành công');
+                }
+
+                navigate('/admin/news');
+            } catch (error) {
+                console.error('❌ Error saving news:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    response: error.response?.data,
+                    status: error.response?.status
+                });
+                const errorMessage = error.response?.data?.message || error.message || 'Có lỗi xảy ra khi lưu tin tức';
+                alert(errorMessage);
+            } finally {
+                setSubmitting(false);
+                setLoading(false);
+            }
+        }
     });
-    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -42,7 +82,7 @@ const NewsForm = () => {
                 setLoading(true);
                 const res = await tinTucAPI.getById(id);
                 if (res.data?.success) {
-                    setFormData(res.data.data);
+                    formik.setValues(res.data.data);
                 }
             } catch (error) {
                 console.error('Error fetching news:', error);
@@ -56,18 +96,8 @@ const NewsForm = () => {
         if (isEdit) {
             fetchNews();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, isEdit]);
-
-    const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? (checked ? 1 : 0) : value
-        }));
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: '' }));
-        }
-    };
 
     const handleImageChange = async (file) => {
         if (!file) return;
@@ -76,56 +106,13 @@ const NewsForm = () => {
             setUploadingImage(true);
             const res = await uploadAPI.uploadSingle(file);
             if (res.data?.success) {
-                setFormData(prev => ({
-                    ...prev,
-                    hinh: res.data.data.url
-                }));
+                formik.setFieldValue('hinh', res.data.data.url);
             }
         } catch (error) {
             console.error('Error uploading image:', error);
             alert('Có lỗi khi tải ảnh lên');
         } finally {
             setUploadingImage(false);
-        }
-    };
-
-    const validate = () => {
-        const newErrors = {};
-
-        if (!formData.tieu_de.trim()) {
-            newErrors.tieu_de = 'Tiêu đề không được để trống';
-        }
-
-        if (!formData.id_loai) {
-            newErrors.id_loai = 'Vui lòng chọn loại tin';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!validate()) return;
-
-        try {
-            setLoading(true);
-
-            if (isEdit) {
-                await tinTucAPI.update(id, formData);
-                alert('Cập nhật tin tức thành công');
-            } else {
-                await tinTucAPI.create(formData);
-                alert('Thêm tin tức thành công');
-            }
-
-            navigate('/admin/news');
-        } catch (error) {
-            console.error('Error saving news:', error);
-            alert(error.response?.data?.message || 'Có lỗi xảy ra');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -151,43 +138,62 @@ const NewsForm = () => {
             </div>
 
             <div className="rounded-lg bg-white dark:bg-slate-800 p-6 shadow">
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={formik.handleSubmit} className="space-y-6">
                     <Input
                         label="Tiêu đề"
                         name="tieu_de"
-                        value={formData.tieu_de}
-                        onChange={handleChange}
+                        value={formik.values.tieu_de}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
                         placeholder="Nhập tiêu đề"
-                        error={errors.tieu_de}
+                        error={formik.touched.tieu_de && formik.errors.tieu_de}
                         required
                     />
 
                     <Textarea
-                        label="Tóm tắt"
-                        name="tom_tat"
-                        value={formData.tom_tat}
-                        onChange={handleChange}
-                        placeholder="Nhập tóm tắt"
+                        label="Mô tả"
+                        name="mo_ta"
+                        value={formik.values.mo_ta}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        placeholder="Nhập mô tả ngắn"
                         rows={3}
+                        error={formik.touched.mo_ta && formik.errors.mo_ta}
                     />
 
-                    <Textarea
-                        label="Nội dung"
-                        name="noi_dung"
-                        value={formData.noi_dung}
-                        onChange={handleChange}
-                        placeholder="Nhập nội dung"
-                        rows={6}
-                    />
+                    <div>
+                        <RichTextEditor
+                            label="Nội dung"
+                            value={formik.values.noi_dung}
+                            onChange={(content) => formik.setFieldValue('noi_dung', content)}
+                            placeholder="Nhập nội dung bài viết..."
+                            minHeight="300px"
+                            error={formik.touched.noi_dung && formik.errors.noi_dung}
+                        />
+
+                        {/* Preview Section */}
+                        {formik.values.noi_dung && (
+                            <div className="mt-4 rounded-lg border border-gray-200 dark:border-slate-700 p-4 bg-gray-50 dark:bg-slate-800">
+                                <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
+                                    📝 Xem trước nội dung:
+                                </h3>
+                                <div
+                                    className="html-content prose prose-sm dark:prose-invert max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: formik.values.noi_dung }}
+                                />
+                            </div>
+                        )}
+                    </div>
 
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <Select
                             label="Loại tin"
                             name="id_loai"
-                            value={formData.id_loai}
-                            onChange={handleChange}
+                            value={formik.values.id_loai}
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
                             options={categoryOptions}
-                            error={errors.id_loai}
+                            error={formik.touched.id_loai && formik.errors.id_loai}
                             required
                         />
 
@@ -195,15 +201,18 @@ const NewsForm = () => {
                             label="Ngày đăng"
                             name="ngay"
                             type="date"
-                            value={formData.ngay}
-                            onChange={handleChange}
+                            value={formik.values.ngay}
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
+                            error={formik.touched.ngay && formik.errors.ngay}
                         />
                     </div>
 
                     <ImageUpload
                         label="Hình ảnh"
-                        value={formData.hinh}
+                        value={formik.values.hinh}
                         onChange={handleImageChange}
+                        error={formik.touched.hinh && formik.errors.hinh}
                     />
 
                     {uploadingImage && (
@@ -214,8 +223,9 @@ const NewsForm = () => {
                         <input
                             type="checkbox"
                             name="an_hien"
-                            checked={formData.an_hien === 1}
-                            onChange={handleChange}
+                            checked={formik.values.an_hien === 1}
+                            onChange={(e) => formik.setFieldValue('an_hien', e.target.checked ? 1 : 0)}
+                            onBlur={formik.handleBlur}
                             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                         <span className="text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -235,7 +245,7 @@ const NewsForm = () => {
                             type="submit"
                             variant="primary"
                             loading={loading}
-                            disabled={uploadingImage}
+                            disabled={uploadingImage || formik.isSubmitting}
                         >
                             {isEdit ? 'Cập nhật' : 'Thêm mới'}
                         </Button>

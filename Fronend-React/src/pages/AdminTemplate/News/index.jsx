@@ -82,7 +82,23 @@ const News = () => {
             )
         },
         { header: 'Tiêu đề', accessor: 'tieu_de' },
-        { header: 'Tóm tắt', accessor: 'tom_tat' },
+        {
+            header: 'Mô tả',
+            render: (row) => {
+                // Strip HTML tags for table display
+                const stripHtml = (html) => {
+                    const tmp = document.createElement('DIV');
+                    tmp.innerHTML = html || '';
+                    return tmp.textContent || tmp.innerText || '';
+                };
+                const plainText = stripHtml(row.mo_ta);
+                return (
+                    <div className="max-w-xs truncate text-sm text-gray-600 dark:text-slate-400">
+                        {plainText || '-'}
+                    </div>
+                );
+            }
+        },
         {
             header: 'Loại tin',
             render: (row) => getCategoryName(row.id_loai)
@@ -93,7 +109,7 @@ const News = () => {
         },
         {
             header: 'Lượt xem',
-            accessor: 'xem'
+            accessor: 'luot_xem'
         }
     ];
 

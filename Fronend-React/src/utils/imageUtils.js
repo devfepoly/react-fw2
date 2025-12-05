@@ -30,11 +30,20 @@ export const getImageUrl = (imagePath) => {
 };
 
 /**
- * Get placeholder image URL
+ * Get placeholder image (SVG Data URI)
  * @param {number} width - Image width
  * @param {number} height - Image height
- * @returns {string} Placeholder URL
+ * @returns {string} Placeholder data URI
  */
 export const getPlaceholderImage = (width = 300, height = 300) => {
-    return `https://via.placeholder.com/${width}x${height}?text=No+Image`;
+    // Generate SVG placeholder instead of external service
+    const svg = `
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#f3f4f6"/>
+            <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="14" fill="#9ca3af" text-anchor="middle" dominant-baseline="middle">
+                No Image
+            </text>
+        </svg>
+    `;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
 };

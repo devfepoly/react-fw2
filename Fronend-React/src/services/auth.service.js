@@ -89,13 +89,51 @@ export const authService = {
 
     // Check if authenticated
     isAuthenticated: () => {
-        return !!(storage.get('user') && storage.get('token'));
+        const hasAuth = !!(storage.get('user') && storage.get('token'));
+        console.log('isAuthenticated check:', {
+            hasAuth,
+            user: storage.get('user'),
+            token: storage.get('token') ? 'exists' : 'missing'
+        });
+        return hasAuth;
     },
 
     // Check if user is admin
     isAdmin: () => {
         const user = storage.get('user');
-        return user?.vai_tro === 1;
+
+        // Nếu không có user, chắc chắn không phải admin
+        if (!user) {
+            console.log('isAdmin check: No user found');
+            return false;
+        }
+
+        const vaiTro = user?.vai_tro;
+        const isAdminResult = vaiTro === 1 || vaiTro === '1' || Number(vaiTro) === 1;
+
+        console.log('🔍 isAdmin check:', {
+            userKeys: Object.keys(user),
+            email: user.email,
+            vai_tro: vaiTro,
+            type: typeof vaiTro,
+            isAdminResult,
+            fullUser: user
+        });
+
+        return isAdminResult;
+    },
+
+    // Debug helper - remove in production
+    debugAuth: () => {
+        const user = storage.get('user');
+        const token = storage.get('token');
+        console.log('🐛 Debug Auth:', {
+            hasUser: !!user,
+            hasToken: !!token,
+            user: user,
+            isAuth: authService.isAuthenticated(),
+            isAdmin: authService.isAdmin()
+        });
     }
 };
 

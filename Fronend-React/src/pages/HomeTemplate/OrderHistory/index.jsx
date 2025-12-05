@@ -10,6 +10,7 @@ const OrderHistory = () => {
     const [loading, setLoading] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const user = authService.getCurrentUser();
+    const isAuthenticated = authService.isAuthenticated();
 
     useEffect(() => {
         if (!user) {
@@ -72,12 +73,6 @@ const OrderHistory = () => {
         return statusMap[status] || statusMap[0];
     };
 
-    // Hiển thị loading khi AuthContext đang load
-    if (authLoading) {
-        console.log('OrderHistory - Showing auth loading...');
-        return <Loading />;
-    }
-
     // Hiển thị loading khi đang fetch orders
     if (loading && isAuthenticated) {
         console.log('OrderHistory - Showing orders loading...');
@@ -92,7 +87,7 @@ const OrderHistory = () => {
                 <div className="container mx-auto px-3 sm:px-4 pb-12 sm:pb-16">
                     <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-6 sm:p-8">
                         <div className="text-center mb-6">
-                            <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                            <div className="w-24 h-24 bg-linear-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                                 <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
@@ -108,7 +103,7 @@ const OrderHistory = () => {
                         <div className="space-y-3">
                             <button
                                 onClick={() => navigate('/login')}
-                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-4 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2"
+                                className="w-full bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-4 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />

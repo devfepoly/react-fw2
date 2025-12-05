@@ -11,14 +11,22 @@ export const AuthGuard = ({ children }) => {
 
 // Protect admin routes
 export const AdminGuard = ({ children }) => {
-    if (!authService.isAuthenticated()) {
+    const isAuth = authService.isAuthenticated();
+    const isAdminUser = authService.isAdmin();
+
+    console.log('AdminGuard check:', { isAuth, isAdminUser });
+
+    if (!isAuth) {
+        console.log('Not authenticated, redirecting to /login');
         return <Navigate to="/login" replace />;
     }
 
-    if (!authService.isAdmin()) {
+    if (!isAdminUser) {
+        console.log('Not admin, redirecting to /');
         return <Navigate to="/" replace />;
     }
 
+    console.log('Admin access granted');
     return children;
 };
 

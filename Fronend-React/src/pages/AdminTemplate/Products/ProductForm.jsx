@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useFormik } from 'formik';
 import { sanPhamAPI, loaiAPI, uploadAPI } from '../../../services/api';
+import { productValidationSchema } from '../../../utils/validationSchemas';
 import Input from '../_components/Input';
 import Select from '../_components/Select';
-import Textarea from '../_components/Textarea';
 import Button from '../_components/Button';
 import ImageUpload from '../_components/ImageUpload';
+import RichTextEditor from '../_components/RichTextEditor';
 
 const ProductForm = () => {
     const navigate = useNavigate();
@@ -13,20 +15,62 @@ const ProductForm = () => {
     const isEdit = !!id;
 
     const [categories, setCategories] = useState([]);
-    const [loading, setLoading] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
-    const [formData, setFormData] = useState({
-        ten_sp: '',
-        gia: '',
-        gia_km: '',
-        hinh: '',
-        ngay: new Date().toISOString().split('T')[0],
-        mo_ta: '',
-        id_loai: '',
-        an_hien: 1,
-        hot: 0
+    const [loading, setLoading] = useState(false);
+
+    // Formik setup
+    const formik = useFormik({
+        initialValues: {
+            ten_sp: '',
+            gia: '',
+            gia_km: '',
+            hinh: '',
+            ngay: new Date().toISOString().split('T')[0],
+            mo_ta: '',
+            id_loai: '',
+            an_hien: 1,
+            hot: 0
+        },
+        validationSchema: productValidationSchema,
+        onSubmit: async (values, { setSubmitting }) => {
+            setLoading(true);
+            try {
+                // Convert string to number for price fields
+                const dataToSubmit = {
+                    ...values,
+                    gia: Number(values.gia),
+                    gia_km: values.gia_km ? Number(values.gia_km) : null,
+                    id_loai: Number(values.id_loai)
+                };
+
+                console.log('📦 Submitting product data:', dataToSubmit);
+
+                if (isEdit) {
+                    const response = await sanPhamAPI.update(id, dataToSubmit);
+                    console.log('✅ Update response:', response.data);
+                    alert('Cập nhật sản phẩm thành công');
+                } else {
+                    const response = await sanPhamAPI.create(dataToSubmit);
+                    console.log('✅ Create response:', response.data);
+                    alert('Thêm sản phẩm thành công');
+                }
+
+                navigate('/admin/products');
+            } catch (error) {
+                console.error('❌ Error saving product:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    response: error.response?.data,
+                    status: error.response?.status
+                });
+                const errorMessage = error.response?.data?.message || error.message || 'Có lỗi xảy ra khi lưu sản phẩm';
+                alert(errorMessage);
+            } finally {
+                setSubmitting(false);
+                setLoading(false);
+            }
+        }
     });
-    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -40,16 +84,14 @@ const ProductForm = () => {
 
         const fetchProduct = async () => {
             try {
-                setLoading(true);
                 const res = await sanPhamAPI.getById(id);
                 if (res.data?.success) {
-                    setFormData(res.data.data);
+                    // Set Formik values
+                    formik.setValues(res.data.data);
                 }
             } catch (error) {
                 console.error('Error fetching product:', error);
                 alert('Có lỗi khi tải thông tin sản phẩm');
-            } finally {
-                setLoading(false);
             }
         };
 
@@ -57,19 +99,8 @@ const ProductForm = () => {
         if (isEdit) {
             fetchProduct();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, isEdit]);
-
-    const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? (checked ? 1 : 0) : value
-        }));
-        // Clear error when user types
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: '' }));
-        }
-    };
 
     const handleImageChange = async (file) => {
         if (!file) {
@@ -81,69 +112,13 @@ const ProductForm = () => {
             setUploadingImage(true);
             const res = await uploadAPI.uploadSingle(file);
             if (res.data?.success) {
-                setFormData(prev => ({
-                    ...prev,
-                    hinh: res.data.data.url
-                }));
+                formik.setFieldValue('hinh', res.data.data.url);
             }
         } catch (error) {
             console.error('Error uploading image:', error);
             alert('Có lỗi khi tải ảnh lên');
         } finally {
             setUploadingImage(false);
-        }
-    };
-
-    const validate = () => {
-        const newErrors = {};
-
-        if (!formData.ten_sp.trim()) {
-            newErrors.ten_sp = 'Tên sản phẩm không được để trống';
-        }
-
-        const gia = Number(formData.gia);
-        const gia_km = Number(formData.gia_km);
-
-        if (!gia || gia <= 0) {
-            newErrors.gia = 'Giá phải lớn hơn 0';
-        }
-
-        if (gia_km && gia_km >= gia) {
-            newErrors.gia_km = 'Giá khuyến mãi phải nhỏ hơn giá gốc';
-        }
-
-        if (!formData.id_loai) {
-            newErrors.id_loai = 'Vui lòng chọn danh mục';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!validate()) {
-            return;
-        }
-
-        try {
-            setLoading(true);
-
-            if (isEdit) {
-                await sanPhamAPI.update(id, formData);
-                alert('Cập nhật sản phẩm thành công');
-            } else {
-                await sanPhamAPI.create(formData);
-                alert('Thêm sản phẩm thành công');
-            }
-
-            navigate('/admin/products');
-        } catch (error) {
-            console.error('Error saving product:', error);
-            alert(error.response?.data?.message || 'Có lỗi xảy ra');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -169,25 +144,27 @@ const ProductForm = () => {
             </div>
 
             <div className="rounded-lg bg-white dark:bg-slate-800 p-6 shadow">
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={formik.handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <Input
                             label="Tên sản phẩm"
                             name="ten_sp"
-                            value={formData.ten_sp}
-                            onChange={handleChange}
+                            value={formik.values.ten_sp}
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
                             placeholder="Nhập tên sản phẩm"
-                            error={errors.ten_sp}
+                            error={formik.touched.ten_sp && formik.errors.ten_sp}
                             required
                         />
 
                         <Select
                             label="Danh mục"
                             name="id_loai"
-                            value={formData.id_loai}
-                            onChange={handleChange}
+                            value={formik.values.id_loai}
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
                             options={categoryOptions}
-                            error={errors.id_loai}
+                            error={formik.touched.id_loai && formik.errors.id_loai}
                             required
                         />
 
@@ -195,10 +172,11 @@ const ProductForm = () => {
                             label="Giá"
                             name="gia"
                             type="number"
-                            value={formData.gia}
-                            onChange={handleChange}
+                            value={formik.values.gia}
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
                             placeholder="Nhập giá"
-                            error={errors.gia}
+                            error={formik.touched.gia && formik.errors.gia}
                             required
                         />
 
@@ -206,34 +184,53 @@ const ProductForm = () => {
                             label="Giá khuyến mãi"
                             name="gia_km"
                             type="number"
-                            value={formData.gia_km}
-                            onChange={handleChange}
+                            value={formik.values.gia_km}
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
                             placeholder="Nhập giá khuyến mãi (nếu có)"
-                            error={errors.gia_km}
+                            error={formik.touched.gia_km && formik.errors.gia_km}
                         />
 
                         <Input
                             label="Ngày"
                             name="ngay"
                             type="date"
-                            value={formData.ngay}
-                            onChange={handleChange}
+                            value={formik.values.ngay}
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
+                            error={formik.touched.ngay && formik.errors.ngay}
                         />
                     </div>
 
-                    <Textarea
-                        label="Mô tả"
-                        name="mo_ta"
-                        value={formData.mo_ta}
-                        onChange={handleChange}
-                        placeholder="Nhập mô tả sản phẩm"
-                        rows={4}
-                    />
+                    <div>
+                        <RichTextEditor
+                            label="Mô tả sản phẩm"
+                            value={formik.values.mo_ta}
+                            onChange={(content) => formik.setFieldValue('mo_ta', content)}
+                            placeholder="Nhập mô tả chi tiết sản phẩm..."
+                            minHeight="250px"
+                            error={formik.touched.mo_ta && formik.errors.mo_ta}
+                        />
+
+                        {/* Preview Section */}
+                        {formik.values.mo_ta && (
+                            <div className="mt-4 rounded-lg border border-gray-200 dark:border-slate-700 p-4 bg-gray-50 dark:bg-slate-800">
+                                <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">
+                                    📝 Xem trước mô tả:
+                                </h3>
+                                <div
+                                    className="html-content prose prose-sm dark:prose-invert max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: formik.values.mo_ta }}
+                                />
+                            </div>
+                        )}
+                    </div>
 
                     <ImageUpload
                         label="Hình ảnh sản phẩm"
-                        value={formData.hinh}
+                        value={formik.values.hinh}
                         onChange={handleImageChange}
+                        error={formik.touched.hinh && formik.errors.hinh}
                     />
 
                     {uploadingImage && (
@@ -245,8 +242,9 @@ const ProductForm = () => {
                             <input
                                 type="checkbox"
                                 name="an_hien"
-                                checked={formData.an_hien === 1}
-                                onChange={handleChange}
+                                checked={formik.values.an_hien === 1}
+                                onChange={(e) => formik.setFieldValue('an_hien', e.target.checked ? 1 : 0)}
+                                onBlur={formik.handleBlur}
                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -258,8 +256,9 @@ const ProductForm = () => {
                             <input
                                 type="checkbox"
                                 name="hot"
-                                checked={formData.hot === 1}
-                                onChange={handleChange}
+                                checked={formik.values.hot === 1}
+                                onChange={(e) => formik.setFieldValue('hot', e.target.checked ? 1 : 0)}
+                                onBlur={formik.handleBlur}
                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <span className="text-sm font-medium text-gray-700 dark:text-slate-300">
@@ -280,7 +279,7 @@ const ProductForm = () => {
                             type="submit"
                             variant="primary"
                             loading={loading}
-                            disabled={uploadingImage}
+                            disabled={uploadingImage || formik.isSubmitting}
                         >
                             {isEdit ? 'Cập nhật' : 'Thêm mới'}
                         </Button>
